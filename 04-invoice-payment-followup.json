@@ -9,7 +9,7 @@
   "nodes": [
     {
       "name": "Cron: Daily 9AM",
-      "type": "@n8n/n8n-nodes-base.cron",
+      "type": "n8n-nodes-base.cron",
       "parameters": {
         "rule": {
           "interval": [
@@ -32,7 +32,7 @@
     },
     {
       "name": "Read Invoices Spreadsheet",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
         "documentId": {
@@ -58,7 +58,7 @@
     },
     {
       "name": "Code: Filter Overdue Invoices",
-      "type": "@n8n/n8n-nodes-base.code",
+      "type": "n8n-nodes-base.code",
       "parameters": {
         "jsCode": "const invoices = $input.all();\nconst today = new Date();\ntoday.setHours(0,0,0,0);\n\nreturn invoices.map(inv => {\n  const due = new Date(inv.json.due_date);\n  due.setHours(0,0,0,0);\n  const daysOverdue = Math.floor((today - due) / (1000*60*60*24));\n  return {...inv, json: {...inv.json, daysOverdue}};\n}).filter(inv => inv.json.status !== 'paid' && inv.json.daysOverdue > 0);"
       },
@@ -71,7 +71,7 @@
     },
     {
       "name": "Router: By Days Overdue",
-      "type": "@n8n/n8n-nodes-base.switch",
+      "type": "n8n-nodes-base.switch",
       "parameters": {
         "dataType": "number",
         "valueComparison": {
@@ -113,7 +113,7 @@
     },
     {
       "name": "Send Friendly Reminder (1 day)",
-      "type": "@n8n/n8n-nodes-base.gmail",
+      "type": "n8n-nodes-base.gmail",
       "parameters": {
         "operation": "send",
         "to": "={{$json.client_email}}",
@@ -129,7 +129,7 @@
     },
     {
       "name": "Send 1st Reminder (7 days)",
-      "type": "@n8n/n8n-nodes-base.gmail",
+      "type": "n8n-nodes-base.gmail",
       "parameters": {
         "operation": "send",
         "to": "={{$json.client_email}}",
@@ -145,7 +145,7 @@
     },
     {
       "name": "Send 2nd Reminder (14 days)",
-      "type": "@n8n/n8n-nodes-base.gmail",
+      "type": "n8n-nodes-base.gmail",
       "parameters": {
         "operation": "send",
         "to": "={{$json.client_email}}",
@@ -161,7 +161,7 @@
     },
     {
       "name": "Send Final Notice (30 days)",
-      "type": "@n8n/n8n-nodes-base.gmail",
+      "type": "n8n-nodes-base.gmail",
       "parameters": {
         "operation": "send",
         "to": "={{$json.client_email}}",
@@ -177,7 +177,7 @@
     },
     {
       "name": "Notify Anthony (30+ days)",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\ud83d\udea8 Factura cr\u00edtica: #{{$json.invoice_number}} - ${{$json.amount}} - {{$json.daysOverdue}} d\u00edas de atraso\nCliente: {{$json.client_name}}",
         "title": "Factura Cr\u00edtica!",
@@ -193,7 +193,7 @@
     },
     {
       "name": "Update Invoice Status",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "update",
         "documentId": {
@@ -234,7 +234,7 @@
     },
     {
       "name": "Error Handler",
-      "type": "@n8n/n8n-nodes-base.errorTrigger",
+      "type": "n8n-nodes-base.errorTrigger",
       "parameters": {},
       "position": [
         1540,
@@ -245,7 +245,7 @@
     },
     {
       "name": "Notify Error",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\u274c Invoice Workflow Error: {{$json.error.message}}",
         "title": "Invoice Workflow Error",

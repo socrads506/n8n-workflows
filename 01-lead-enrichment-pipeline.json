@@ -9,7 +9,7 @@
   "nodes": [
     {
       "name": "Cron Trigger",
-      "type": "@n8n/n8n-nodes-base.cron",
+      "type": "n8n-nodes-base.cron",
       "parameters": {
         "rule": {
           "interval": [
@@ -32,7 +32,7 @@
     },
     {
       "name": "Read Spreadsheet (Leads Source)",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
         "documentId": {
@@ -58,7 +58,7 @@
     },
     {
       "name": "Check Duplicates (Idempotency)",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
         "documentId": {
@@ -82,7 +82,7 @@
     },
     {
       "name": "Filter New Leads (Set Node)",
-      "type": "@n8n/n8n-nodes-base.set",
+      "type": "n8n-nodes-base.set",
       "parameters": {
         "mode": "raw",
         "assignments": {
@@ -105,7 +105,7 @@
     },
     {
       "name": "Enrich Lead (AbstractAPI/clearbit)",
-      "type": "@n8n/n8n-nodes-base.httpRequest",
+      "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "={{$json.email.includes('@') ? 'https://abstractapi.com/api/v1/too/emails/validate?api_key=' + $env.CLEARBIT_API_KEY + '&email=' + $json.email : ''}}",
         "method": "GET",
@@ -120,7 +120,7 @@
     },
     {
       "name": "Enrich Company Data",
-      "type": "@n8n/n8n-nodes-base.httpRequest",
+      "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "https://company-enrichment.example.com/v1/enrich?email={{$json.email}}",
         "method": "GET",
@@ -135,7 +135,7 @@
     },
     {
       "name": "Score Lead",
-      "type": "@n8n/n8n-nodes-base.code",
+      "type": "n8n-nodes-base.code",
       "parameters": {
         "jsCode": "// Lead scoring logic\nconst lead = $input.first().json;\nlet score = 0;\n\nif (lead.company_size > 50) score += 30;\nif (lead.industry === 'tech' || lead.industry === 'finance') score += 25;\nif (lead.job_title && (lead.job_title.includes('Director') || lead.job_title.includes('VP') || lead.job_title.includes('CEO'))) score += 20;\nif (lead.location === 'Costa Rica' || lead.location === 'CR') score += 15;\nif (lead.has_website) score += 10;\n\nreturn { score, tier: score >= 70 ? 'A' : score >= 40 ? 'B' : 'C' };"
       },
@@ -148,7 +148,7 @@
     },
     {
       "name": "Route by Tier",
-      "type": "@n8n/n8n-nodes-base.switch",
+      "type": "n8n-nodes-base.switch",
       "parameters": {
         "dataType": "string",
         "valueComparison": {
@@ -182,7 +182,7 @@
     },
     {
       "name": "Add Tier-A to CRM (Notion/Airtable)",
-      "type": "@n8n/n8n-nodes-base.httpRequest",
+      "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "https://api.notion.com/v1/pages",
         "method": "POST",
@@ -246,7 +246,7 @@
     },
     {
       "name": "Notify High-Value (Telegram/Pushover)",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "credential": "",
         "message": "\ud83c\udfaf Nuevo Lead Tier A: {{$json.name}} ({{$json.email}}) - Score: {{$json.score}}",
@@ -262,7 +262,7 @@
     },
     {
       "name": "Write to Processed Leads",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
         "documentId": {
@@ -294,7 +294,7 @@
     },
     {
       "name": "Error Handler",
-      "type": "@n8n/n8n-nodes-base.errorTrigger",
+      "type": "n8n-nodes-base.errorTrigger",
       "parameters": {},
       "position": [
         1980,
@@ -305,7 +305,7 @@
     },
     {
       "name": "Notify Error (Pushover)",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\u274c Lead Pipeline Error: {{$json.error.message}}",
         "title": "Workflow Error",
@@ -320,7 +320,7 @@
     },
     {
       "name": "Write Error to Log",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
         "documentId": {

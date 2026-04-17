@@ -9,7 +9,7 @@
   "nodes": [
     {
       "name": "Webhook Trigger",
-      "type": "@n8n/n8n-nodes-base.webhook",
+      "type": "n8n-nodes-base.webhook",
       "parameters": {
         "httpMethod": "POST",
         "path": "client-onboard",
@@ -25,7 +25,7 @@
     },
     {
       "name": "Validate Payload",
-      "type": "@n8n/n8n-nodes-base.switch",
+      "type": "n8n-nodes-base.switch",
       "parameters": {
         "dataType": "string",
         "valueComparison": {
@@ -51,7 +51,7 @@
     },
     {
       "name": "Code: Build Onboarding Data",
-      "type": "@n8n/n8n-nodes-base.code",
+      "type": "n8n-nodes-base.code",
       "parameters": {
         "jsCode": "const d = $input.first().json;\nconst now = new Date();\nconst due = (days) => {\n  const dt = new Date(now);\n  dt.setDate(dt.getDate() + days);\n  return dt.toISOString();\n};\nreturn [{\n  json: {\n    client_name: d.client_name,\n    client_email: d.client_email,\n    company: d.company,\n    service: d.service,\n    start_date: d.start_date || now.toISOString().split('T')[0],\n    tasks: [\n      { task: 'Enviar email de bienvenida + brochure', due: due(1), priority: 'high' },\n      { task: 'Agendar llamada de descubierta (30 min)', due: due(3), priority: 'high' },\n      { task: 'Enviar formulario de intake', due: due(3), priority: 'medium' },\n      { task: 'Crear carpeta en Drive + compartir', due: due(2), priority: 'medium' },\n      { task: 'Preparar propuesta detallada', due: due(7), priority: 'medium' },\n      { task: 'Generar invoice de setup si aplica', due: due(5), priority: 'medium' },\n      { task: 'Primer entregable seg\u00fan servicio', due: due(14), priority: 'high' },\n      { task: 'Revisi\u00f3n 30 d\u00edas + feedback', due: due(30), priority: 'low' }\n    ]\n  }\n}];"
       },
@@ -64,7 +64,7 @@
     },
     {
       "name": "Router: All Onboarding Steps",
-      "type": "@n8n/n8n-nodes-base.splitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
       "parameters": {
         "batchSize": 1,
         "options": {}
@@ -78,7 +78,7 @@
     },
     {
       "name": "Send Welcome Email",
-      "type": "@n8n/n8n-nodes-base.gmail",
+      "type": "n8n-nodes-base.gmail",
       "parameters": {
         "operation": "send",
         "to": "={{$json.client_email}}",
@@ -102,7 +102,7 @@
     },
     {
       "name": "Create Task (Google Tasks)",
-      "type": "@n8n/n8n-nodes-base.googleTasks",
+      "type": "n8n-nodes-base.googleTasks",
       "parameters": {
         "operation": "createTask",
         "taskList": {
@@ -124,7 +124,7 @@
     },
     {
       "name": "Create Notion Page (Client Folder)",
-      "type": "@n8n/n8n-nodes-base.httpRequest",
+      "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "https://api.notion.com/v1/pages",
         "method": "POST",
@@ -197,7 +197,7 @@
     },
     {
       "name": "Notify Anthony (Pushover)",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\ud83c\udd95 Nuevo cliente onboardeado: {{$json.client_name}} ({{$json.company}})\nServicio: {{$json.service}}\n{{$json.tasks.length}} tareas creadas",
         "title": "Cliente Nuevo - Onboarding",
@@ -212,7 +212,7 @@
     },
     {
       "name": "Done: Send Confirmation",
-      "type": "@n8n/n8n-nodes-base.gmail",
+      "type": "n8n-nodes-base.gmail",
       "parameters": {
         "operation": "send",
         "to": "={{$json.client_email}}",
@@ -228,7 +228,7 @@
     },
     {
       "name": "Error Handler",
-      "type": "@n8n/n8n-nodes-base.errorTrigger",
+      "type": "n8n-nodes-base.errorTrigger",
       "parameters": {},
       "position": [
         1540,
@@ -239,7 +239,7 @@
     },
     {
       "name": "Notify Onboarding Error",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\u274c Onboarding Error: {{$json.error.message}} - Cliente: {{$json.client_email}}",
         "title": "Workflow Error",

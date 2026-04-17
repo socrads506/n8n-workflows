@@ -9,7 +9,7 @@
   "nodes": [
     {
       "name": "Cron: Daily 6PM",
-      "type": "@n8n/n8n-nodes-base.cron",
+      "type": "n8n-nodes-base.cron",
       "parameters": {
         "rule": {
           "interval": [
@@ -32,7 +32,7 @@
     },
     {
       "name": "Read YouTube RSS / Watch Later",
-      "type": "@n8n/n8n-nodes-base.rssFeedRead",
+      "type": "n8n-nodes-base.rssFeedRead",
       "parameters": {
         "url": "https://www.youtube.com/feeds/videos.xml?playlist_id={{$env.YT_WATCH_LATER_ID}}",
         "options": {
@@ -48,7 +48,7 @@
     },
     {
       "name": "Router: Content Items",
-      "type": "@n8n/n8n-nodes-base.splitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
       "parameters": {
         "batchSize": 1
       },
@@ -61,7 +61,7 @@
     },
     {
       "name": "Get YouTube Transcript",
-      "type": "@n8n/n8n-nodes-base.httpRequest",
+      "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "https://www.youtube.com/api/timedtext?v={{$json.videoId}}&lang=es&fmt=json3",
         "method": "GET",
@@ -78,7 +78,7 @@
     },
     {
       "name": "AI: Extract Key Points",
-      "type": "@n8n/n8n-nodes-base.openAi",
+      "type": "n8n-nodes-base.openAi",
       "parameters": {
         "resource": "chat",
         "operation": "chat",
@@ -107,7 +107,7 @@
     },
     {
       "name": "Parse AI Output",
-      "type": "@n8n/n8n-nodes-base.set",
+      "type": "n8n-nodes-base.set",
       "parameters": {
         "mode": "raw",
         "assignments": {
@@ -130,7 +130,7 @@
     },
     {
       "name": "Code: Parse JSON",
-      "type": "@n8n/n8n-nodes-base.code",
+      "type": "n8n-nodes-base.code",
       "parameters": {
         "jsCode": "try {\n  const text = $input.first().json.content;\n  const parsed = JSON.parse(text);\n  const video = $('Router: Content Items').first().json;\n  return [{\n    json: {\n      ...parsed,\n      video_title: video.title,\n      video_url: 'https://youtube.com/watch?v=' + video.videoId,\n      scheduled_date: new Date(Date.now() + 86400000 * (Math.random() * 3 + 1)).toISOString()\n    }\n  }];\n} catch(e) {\n  return [];\n}"
       },
@@ -143,7 +143,7 @@
     },
     {
       "name": "Append to Content Calendar (Sheet)",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
         "documentId": {
@@ -177,7 +177,7 @@
     },
     {
       "name": "Append LinkedIn",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
         "documentId": {
@@ -211,7 +211,7 @@
     },
     {
       "name": "Append Newsletter",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
         "documentId": {
@@ -245,7 +245,7 @@
     },
     {
       "name": "Notify Content Created",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\ud83d\udcdd Contenido generado: {{$json.video_title}}\n- 3 tweets\n- 1 LinkedIn post\n- 1 newsletter snippet",
         "title": "Content Pipeline"
@@ -259,7 +259,7 @@
     },
     {
       "name": "Error Handler",
-      "type": "@n8n/n8n-nodes-base.errorTrigger",
+      "type": "n8n-nodes-base.errorTrigger",
       "parameters": {},
       "position": [
         880,
@@ -270,7 +270,7 @@
     },
     {
       "name": "Notify Error",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\u274c Content Pipeline Error: {{$json.error.message}}",
         "title": "Content Error",

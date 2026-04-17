@@ -9,7 +9,7 @@
   "nodes": [
     {
       "name": "Cron: Every 6 Hours",
-      "type": "@n8n/n8n-nodes-base.cron",
+      "type": "n8n-nodes-base.cron",
       "parameters": {
         "rule": {
           "interval": [
@@ -32,7 +32,7 @@
     },
     {
       "name": "Read Research Queue",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
         "documentId": {
@@ -58,7 +58,7 @@
     },
     {
       "name": "Code: Get Next Pending",
-      "type": "@n8n/n8n-nodes-base.code",
+      "type": "n8n-nodes-base.code",
       "parameters": {
         "jsCode": "const items = $input.all();\nconst pending = items.filter(i => i.json.status === 'pending').slice(0, 3);\nreturn pending.length ? pending : [];"
       },
@@ -71,7 +71,7 @@
     },
     {
       "name": "Router: Research Tasks",
-      "type": "@n8n/n8n-nodes-base.splitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
       "parameters": {
         "batchSize": 1
       },
@@ -84,7 +84,7 @@
     },
     {
       "name": "Web Search (Tavily)",
-      "type": "@n8n/n8n-nodes-base.tavily",
+      "type": "n8n-nodes-base.tavily",
       "parameters": {
         "operation": "search",
         "query": "={{$json.query}}",
@@ -103,7 +103,7 @@
     },
     {
       "name": "AI: Summarize Findings",
-      "type": "@n8n/n8n-nodes-base.openAi",
+      "type": "n8n-nodes-base.openAi",
       "parameters": {
         "resource": "chat",
         "operation": "chat",
@@ -132,7 +132,7 @@
     },
     {
       "name": "Code: Build Report",
-      "type": "@n8n/n8n-nodes-base.code",
+      "type": "n8n-nodes-base.code",
       "parameters": {
         "jsCode": "const task = $('Router: Research Tasks').first().json;\nconst summary = $input.first().json;\n\n return [{\n  json: {\n    topic: task.topic,\n    query: task.query,\n    report: summary.choices?.[0]?.message?.content || JSON.stringify(summary),\n    researched_at: new Date().toISOString(),\n    status: 'completed',\n    priority: task.priority\n  }\n}];"
       },
@@ -145,7 +145,7 @@
     },
     {
       "name": "Append to Knowledge Base (Drive)",
-      "type": "@n8n/n8n-nodes-base.googleDrive",
+      "type": "n8n-nodes-base.googleDrive",
       "parameters": {
         "operation": "upload",
         "fileName": "={{'Research-' + $json.topic.replace(/[^a-z0-9]/gi, '-') + '-' + $now.toISOString().split('T')[0] + '.md'}}",
@@ -166,7 +166,7 @@
     },
     {
       "name": "Update Queue Status",
-      "type": "@n8n/n8n-nodes-base.googleSheets",
+      "type": "n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "update",
         "documentId": {
@@ -207,7 +207,7 @@
     },
     {
       "name": "Notify Research Done",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\u2705 Research completado: {{$json.topic}}",
         "title": "Research Listo"
@@ -221,7 +221,7 @@
     },
     {
       "name": "No Tasks: Idle",
-      "type": "@n8n/n8n-nodes-base.noOp",
+      "type": "n8n-nodes-base.noOp",
       "parameters": {},
       "position": [
         660,
@@ -232,7 +232,7 @@
     },
     {
       "name": "Error Handler",
-      "type": "@n8n/n8n-nodes-base.errorTrigger",
+      "type": "n8n-nodes-base.errorTrigger",
       "parameters": {},
       "position": [
         880,
@@ -243,7 +243,7 @@
     },
     {
       "name": "Notify Research Error",
-      "type": "@n8n/n8n-nodes-base.pushover",
+      "type": "n8n-nodes-base.pushover",
       "parameters": {
         "message": "\u274c Research Pipeline Error: {{$json.error.message}}",
         "title": "Research Error",
