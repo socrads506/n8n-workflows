@@ -1,83 +1,154 @@
 {
+  "updatedAt": "2026-04-17T05:53:02.761Z",
+  "createdAt": "2026-04-17T05:53:02.761Z",
+  "id": "cc0788fe-b09a-4b99-b766-7a5924e4a3e9",
   "name": "Lead Enrichment Pipeline",
+  "description": "Cron diario 8AM: leads \u2192 enrich \u2192 score \u2192 CRM + notify",
+  "active": false,
+  "isArchived": false,
   "nodes": [
     {
       "name": "Cron Trigger",
-      "type": "n8n-nodes-base.cron",
+      "type": "@n8n/n8n-nodes-base.cron",
       "parameters": {
         "rule": {
-          "interval": [{"field": "cron", "properties": {"expression": "0 8 * * *", "timezone": "America/Mexico_City"}}]
+          "interval": [
+            {
+              "field": "cron",
+              "properties": {
+                "expression": "0 8 * * *",
+                "timezone": "America/Mexico_City"
+              }
+            }
+          ]
         }
       },
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "a0e6b8ee-fd08-447c-b2f6-9d6df9b86c48"
     },
     {
       "name": "Read Spreadsheet (Leads Source)",
-      "type": "n8n-nodes-base.googleSheets",
+      "type": "@n8n/n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
-        "documentId": {"__rl": true, "mode": "list", "value": ""},
-        "sheetName": {"__rl": true, "mode": "list", "value": "Hoja 1"},
-        "options": {"outputFormatting": true}
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Hoja 1"
+        },
+        "options": {
+          "outputFormatting": true
+        }
       },
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "3ad4ac10-ec30-44be-baae-1a67251118f7"
     },
     {
       "name": "Check Duplicates (Idempotency)",
-      "type": "n8n-nodes-base.googleSheets",
+      "type": "@n8n/n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
-        "documentId": {"__rl": true, "mode": "list", "value": ""},
-        "sheetName": {"__rl": true, "mode": "list", "value": "Processed Leads"},
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Processed Leads"
+        },
         "options": {}
       },
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "46dbdb46-cfbe-46a8-8a45-4546d0bbbeaf"
     },
     {
       "name": "Filter New Leads (Set Node)",
-      "type": "n8n-nodes-base.set",
+      "type": "@n8n/n8n-nodes-base.set",
       "parameters": {
         "mode": "raw",
         "assignments": {
           "assignments": [
-            {"name": "new_leads", "value": "={{$json.leads.filter(l => !$matches[0].some(p => p.email === l.email))}}", "type": "string"}
+            {
+              "name": "new_leads",
+              "value": "={{$json.leads.filter(l => !$matches[0].some(p => p.email === l.email))}}",
+              "type": "string"
+            }
           ]
         },
         "options": {}
       },
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "1171fe7a-ee47-4e4b-a666-e7d96bc210b8"
     },
     {
       "name": "Enrich Lead (AbstractAPI/clearbit)",
-      "type": "n8n-nodes-base.httpRequest",
+      "type": "@n8n/n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "={{$json.email.includes('@') ? 'https://abstractapi.com/api/v1/too/emails/validate?api_key=' + $env.CLEARBIT_API_KEY + '&email=' + $json.email : ''}}",
         "method": "GET",
         "options": {}
       },
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "0924eff7-abd2-43f4-a374-889099306598"
     },
     {
       "name": "Enrich Company Data",
-      "type": "n8n-nodes-base.httpRequest",
+      "type": "@n8n/n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "https://company-enrichment.example.com/v1/enrich?email={{$json.email}}",
         "method": "GET",
         "options": {}
       },
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "9cf2ca69-6633-406c-8578-3e720ab5810a"
     },
     {
       "name": "Score Lead",
-      "type": "n8n-nodes-base.code",
+      "type": "@n8n/n8n-nodes-base.code",
       "parameters": {
         "jsCode": "// Lead scoring logic\nconst lead = $input.first().json;\nlet score = 0;\n\nif (lead.company_size > 50) score += 30;\nif (lead.industry === 'tech' || lead.industry === 'finance') score += 25;\nif (lead.job_title && (lead.job_title.includes('Director') || lead.job_title.includes('VP') || lead.job_title.includes('CEO'))) score += 20;\nif (lead.location === 'Costa Rica' || lead.location === 'CR') score += 15;\nif (lead.has_website) score += 10;\n\nreturn { score, tier: score >= 70 ? 'A' : score >= 40 ? 'B' : 'C' };"
       },
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "3c6b0f18-b541-4756-9d33-877cdf73d1f8"
     },
     {
       "name": "Route by Tier",
-      "type": "n8n-nodes-base.switch",
+      "type": "@n8n/n8n-nodes-base.switch",
       "parameters": {
         "dataType": "string",
         "valueComparison": {
@@ -86,101 +157,349 @@
         },
         "rules": {
           "values": [
-            {"value2": "A", "operation": "equals"},
-            {"value2": "B", "operation": "equals"},
-            {"value2": "C", "operation": "equals"}
+            {
+              "value2": "A",
+              "operation": "equals"
+            },
+            {
+              "value2": "B",
+              "operation": "equals"
+            },
+            {
+              "value2": "C",
+              "operation": "equals"
+            }
           ]
         },
         "fallbackOutput": "null"
       },
-      "position": [1540, 0]
+      "position": [
+        1540,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "d91e2041-f436-4cf4-948f-b00d5fc2766b"
     },
     {
       "name": "Add Tier-A to CRM (Notion/Airtable)",
-      "type": "n8n-nodes-base.httpRequest",
+      "type": "@n8n/n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "https://api.notion.com/v1/pages",
         "method": "POST",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpQueryAuth",
         "sendHeaders": true,
-        "headerParameters": {"parameters": [{"name": "Authorization", "value": "Bearer {{$env.NOTION_API_KEY}}"}, {"name": "Content-Type", "value": "application/json"}]},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.NOTION_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "bodyParameters": {
           "parameters": [
-            {"name": "parent", "value": {"database_id": "{{$env.NOTION_LEADS_DB}}"}},
-            {"name": "properties", "value": {"Name": {"title": [{"text": {"content": "{{$json.name}}"}}], "Score": {"number": "{{$json.score}}"}, "Tier": {"select": {"name": "{{$json.tier}}"}}, "Email": {"email": "{{$json.email}}"}}}}
+            {
+              "name": "parent",
+              "value": {
+                "database_id": "{{$env.NOTION_LEADS_DB}}"
+              }
+            },
+            {
+              "name": "properties",
+              "value": {
+                "Name": {
+                  "title": [
+                    {
+                      "text": {
+                        "content": "{{$json.name}}"
+                      }
+                    }
+                  ],
+                  "Score": {
+                    "number": "{{$json.score}}"
+                  },
+                  "Tier": {
+                    "select": {
+                      "name": "{{$json.tier}}"
+                    }
+                  },
+                  "Email": {
+                    "email": "{{$json.email}}"
+                  }
+                }
+              }
+            }
           ]
         }
       },
-      "position": [1760, -200]
+      "position": [
+        1760,
+        -200
+      ],
+      "typeVersion": 1.0,
+      "id": "54c5d11c-445c-46f2-849c-b17124d21e74"
     },
     {
       "name": "Notify High-Value (Telegram/Pushover)",
-      "type": "n8n-nodes-base.pushover",
+      "type": "@n8n/n8n-nodes-base.pushover",
       "parameters": {
         "credential": "",
-        "message": "🎯 Nuevo Lead Tier A: {{$json.name}} ({{$json.email}}) - Score: {{$json.score}}",
+        "message": "\ud83c\udfaf Nuevo Lead Tier A: {{$json.name}} ({{$json.email}}) - Score: {{$json.score}}",
         "title": "Lead de Alto Valor",
         "sound": "bike"
       },
-      "position": [1760, 0]
+      "position": [
+        1760,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "48b5a861-d2e8-48d2-bf26-48edf026cb16"
     },
     {
       "name": "Write to Processed Leads",
-      "type": "n8n-nodes-base.googleSheets",
+      "type": "@n8n/n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
-        "documentId": {"__rl": true, "mode": "list", "value": ""},
-        "sheetName": {"__rl": true, "mode": "list", "value": "Processed Leads"},
-        "columns": {"mappingMode": "defineBelow", "value": {"email": "={{$json.email}}", "name": "={{$json.name}}", "score": "={{$json.score}}", "processed_at": "={{$now}}"}}
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Processed Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{$json.email}}",
+            "name": "={{$json.name}}",
+            "score": "={{$json.score}}",
+            "processed_at": "={{$now}}"
+          }
+        }
       },
-      "position": [1760, 200]
+      "position": [
+        1760,
+        200
+      ],
+      "typeVersion": 1.0,
+      "id": "fe168808-2b4e-42b4-bf50-6da2661f35bb"
     },
     {
       "name": "Error Handler",
-      "type": "n8n-nodes-base.errorTrigger",
+      "type": "@n8n/n8n-nodes-base.errorTrigger",
       "parameters": {},
-      "position": [1980, 400]
+      "position": [
+        1980,
+        400
+      ],
+      "typeVersion": 1.0,
+      "id": "6b5447cc-fb6f-4ae6-ae2c-9a631ed43ad7"
     },
     {
       "name": "Notify Error (Pushover)",
-      "type": "n8n-nodes-base.pushover",
+      "type": "@n8n/n8n-nodes-base.pushover",
       "parameters": {
-        "message": "❌ Lead Pipeline Error: {{$json.error.message}}",
+        "message": "\u274c Lead Pipeline Error: {{$json.error.message}}",
         "title": "Workflow Error",
         "priority": 2
       },
-      "position": [2200, 400]
+      "position": [
+        2200,
+        400
+      ],
+      "typeVersion": 1.0,
+      "id": "8a28a331-633f-4c73-915b-068f4e3ae000"
     },
     {
       "name": "Write Error to Log",
-      "type": "n8n-nodes-base.googleSheets",
+      "type": "@n8n/n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "append",
-        "documentId": {"__rl": true, "mode": "list", "value": ""},
-        "sheetName": {"__rl": true, "mode": "list", "value": "Workflow Errors"}
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Workflow Errors"
+        }
       },
-      "position": [2420, 400]
+      "position": [
+        2420,
+        400
+      ],
+      "typeVersion": 1.0,
+      "id": "2e3830be-2c86-4ad1-ba26-bd8211e9966f"
     }
   ],
   "connections": {
-    "Cron Trigger": {"main": [[{"node": "Read Spreadsheet (Leads Source)", "type": "main", "index": 0}]]},
-    "Read Spreadsheet (Leads Source)": {"main": [[{"node": "Check Duplicates (Idempotency)", "type": "main", "index": 0}]]},
-    "Check Duplicates (Idempotency)": {"main": [[{"node": "Filter New Leads (Set Node)", "type": "main", "index": 0}]]},
-    "Filter New Leads (Set Node)": {"main": [[{"node": "Enrich Lead (AbstractAPI/clearbit)", "type": "main", "index": 0}]]},
-    "Enrich Lead (AbstractAPI/clearbit)": {"main": [[{"node": "Enrich Company Data", "type": "main", "index": 0}]]},
-    "Enrich Company Data": {"main": [[{"node": "Score Lead", "type": "main", "index": 0}]]},
-    "Score Lead": {"main": [[{"node": "Route by Tier", "type": "main", "index": 0}]]},
-    "Route by Tier": {"main": [
-      [{"node": "Add Tier-A to CRM (Notion/Airtable)", "type": "main", "index": 0}],
-      [{"node": "Write to Processed Leads", "type": "main", "index": 0}],
-      [{"node": "Write to Processed Leads", "type": "main", "index": 0}]
-    ]},
-    "Add Tier-A to CRM (Notion/Airtable)": {"main": [[{"node": "Notify High-Value (Telegram/Pushover)", "type": "main", "index": 0}]]},
-    "Notify High-Value (Telegram/Pushover)": {"main": [[{"node": "Write to Processed Leads", "type": "main", "index": 0}]]},
-    "Write to Processed Leads": {"main": [[{"node": "Error Handler", "type": "main", "index": 0}]]},
-    "Error Handler": {"main": [[{"node": "Notify Error (Pushover)", "type": "main", "index": 0}]]},
-    "Notify Error (Pushover)": {"main": [[{"node": "Write Error to Log", "type": "main", "index": 0}]]}
+    "Cron Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Spreadsheet (Leads Source)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Spreadsheet (Leads Source)": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicates (Idempotency)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicates (Idempotency)": {
+      "main": [
+        [
+          {
+            "node": "Filter New Leads (Set Node)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Leads (Set Node)": {
+      "main": [
+        [
+          {
+            "node": "Enrich Lead (AbstractAPI/clearbit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Lead (AbstractAPI/clearbit)": {
+      "main": [
+        [
+          {
+            "node": "Enrich Company Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Company Data": {
+      "main": [
+        [
+          {
+            "node": "Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Lead": {
+      "main": [
+        [
+          {
+            "node": "Route by Tier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Tier": {
+      "main": [
+        [
+          {
+            "node": "Add Tier-A to CRM (Notion/Airtable)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write to Processed Leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write to Processed Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Tier-A to CRM (Notion/Airtable)": {
+      "main": [
+        [
+          {
+            "node": "Notify High-Value (Telegram/Pushover)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify High-Value (Telegram/Pushover)": {
+      "main": [
+        [
+          {
+            "node": "Write to Processed Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Processed Leads": {
+      "main": [
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Notify Error (Pushover)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Error (Pushover)": {
+      "main": [
+        [
+          {
+            "node": "Write Error to Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "settings": {
     "executionOrder": "v1",
@@ -189,13 +508,19 @@
     "errorWorkflow": ""
   },
   "staticData": null,
-  "tags": ["leads", "crm", "enrichment", "cr"],
   "meta": {
-    "description": "Every 8AM: read new leads → enrich with company data → score → route to CRM → notify on high-value leads",
-    "author": "Logos",
-    "created": "2026-04-16",
-    "tier": "A",
-    "idempotent": true,
-    "credentials_needed": ["Google Sheets", "Notion API", "Pushover"]
-  }
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "versionId": "0fac73ec-c881-4afd-a1e7-3d8047a18a3f",
+  "activeVersionId": "0fac73ec-c881-4afd-a1e7-3d8047a18a3f",
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "projectId": "y8YB5n4L5hyzosCq",
+      "role": "workflow:owner"
+    }
+  ]
 }

@@ -1,144 +1,380 @@
 {
+  "updatedAt": "2026-04-17T05:53:02.761Z",
+  "createdAt": "2026-04-17T05:53:02.761Z",
+  "id": "2ba828e0-da92-47ff-8356-6b2b4ce16afe",
   "name": "AI Research Agent Pipeline",
+  "description": "Cada 6h: research queue \u2192 web search \u2192 resumen AI \u2192 Drive",
+  "active": false,
+  "isArchived": false,
   "nodes": [
     {
       "name": "Cron: Every 6 Hours",
-      "type": "n8n-nodes-base.cron",
+      "type": "@n8n/n8n-nodes-base.cron",
       "parameters": {
-        "rule": {"interval": [{"field": "cron", "properties": {"expression": "0 */6 * * *", "timezone": "America/Mexico_City"}}]}
+        "rule": {
+          "interval": [
+            {
+              "field": "cron",
+              "properties": {
+                "expression": "0 */6 * * *",
+                "timezone": "America/Mexico_City"
+              }
+            }
+          ]
+        }
       },
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "792d2970-408f-48aa-8443-309f1db379d0"
     },
     {
       "name": "Read Research Queue",
-      "type": "n8n-nodes-base.googleSheets",
+      "type": "@n8n/n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "read",
-        "documentId": {"__rl": true, "mode": "list", "value": ""},
-        "sheetName": {"__rl": true, "mode": "list", "value": "Research Queue"},
-        "options": {"outputFormatting": true}
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Research Queue"
+        },
+        "options": {
+          "outputFormatting": true
+        }
       },
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "b7152b2a-12be-416b-ac93-0647d4878b4d"
     },
     {
       "name": "Code: Get Next Pending",
-      "type": "n8n-nodes-base.code",
+      "type": "@n8n/n8n-nodes-base.code",
       "parameters": {
         "jsCode": "const items = $input.all();\nconst pending = items.filter(i => i.json.status === 'pending').slice(0, 3);\nreturn pending.length ? pending : [];"
       },
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "22a7573e-88d5-4453-91ea-c96e11b2fa3e"
     },
     {
       "name": "Router: Research Tasks",
-      "type": "n8n-nodes-base.splitInBatches",
-      "parameters": {"batchSize": 1},
-      "position": [660, 0]
+      "type": "@n8n/n8n-nodes-base.splitInBatches",
+      "parameters": {
+        "batchSize": 1
+      },
+      "position": [
+        660,
+        0
+      ],
+      "typeVersion": 1.0,
+      "id": "a7b85918-5fe4-42cc-9281-d371d8071d25"
     },
     {
       "name": "Web Search (Tavily)",
-      "type": "n8n-nodes-base.tavily",
+      "type": "@n8n/n8n-nodes-base.tavily",
       "parameters": {
         "operation": "search",
         "query": "={{$json.query}}",
-        "maxResults": {"__rl": true, "mode": "list", "value": 10}
+        "maxResults": {
+          "__rl": true,
+          "mode": "list",
+          "value": 10
+        }
       },
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ],
+      "typeVersion": 1.0,
+      "id": "d5ffbcb2-015f-468c-bd09-766073040eae"
     },
     {
       "name": "AI: Summarize Findings",
-      "type": "n8n-nodes-base.openAi",
+      "type": "@n8n/n8n-nodes-base.openAi",
       "parameters": {
         "resource": "chat",
         "operation": "chat",
         "prompt": {
           "messages": [
-            {"role": "system", "content": "Eres un research analyst experto. Vas a recibir resultados de búsqueda web y vas a escribir un resumen estructurado en español con:\n\n## Tema\n\n## Hallazgos Principales (3-5 puntos)\n\n## Datos Clave (con fuentes)\n\n## Implicaciones\n\n## Siguientes Preguntas\n\nSé conciso, factual, y cita las fuentes de donde viene cada dato."},
-            {"role": "user", "content": "={{'Tema: ' + $('Router: Research Tasks').first().json.topic + '\\n\\nResultados de búsqueda:\\n' + JSON.stringify($input.all().map(i => i.json), null, 2)}}"}
+            {
+              "role": "system",
+              "content": "Eres un research analyst experto. Vas a recibir resultados de b\u00fasqueda web y vas a escribir un resumen estructurado en espa\u00f1ol con:\n\n## Tema\n\n## Hallazgos Principales (3-5 puntos)\n\n## Datos Clave (con fuentes)\n\n## Implicaciones\n\n## Siguientes Preguntas\n\nS\u00e9 conciso, factual, y cita las fuentes de donde viene cada dato."
+            },
+            {
+              "role": "user",
+              "content": "={{'Tema: ' + $('Router: Research Tasks').first().json.topic + '\\n\\nResultados de b\u00fasqueda:\\n' + JSON.stringify($input.all().map(i => i.json), null, 2)}}"
+            }
           ]
         },
-        "options": {"temperature": 0.3}
+        "options": {
+          "temperature": 0.3
+        }
       },
-      "position": [1100, -100]
+      "position": [
+        1100,
+        -100
+      ],
+      "typeVersion": 1.0,
+      "id": "73cf8f37-abc9-4a3b-87fa-3d09814f690b"
     },
     {
       "name": "Code: Build Report",
-      "type": "n8n-nodes-base.code",
+      "type": "@n8n/n8n-nodes-base.code",
       "parameters": {
         "jsCode": "const task = $('Router: Research Tasks').first().json;\nconst summary = $input.first().json;\n\n return [{\n  json: {\n    topic: task.topic,\n    query: task.query,\n    report: summary.choices?.[0]?.message?.content || JSON.stringify(summary),\n    researched_at: new Date().toISOString(),\n    status: 'completed',\n    priority: task.priority\n  }\n}];"
       },
-      "position": [1320, -100]
+      "position": [
+        1320,
+        -100
+      ],
+      "typeVersion": 1.0,
+      "id": "933e9fcd-7eed-4b1e-a820-ee27e989665c"
     },
     {
       "name": "Append to Knowledge Base (Drive)",
-      "type": "n8n-nodes-base.googleDrive",
+      "type": "@n8n/n8n-nodes-base.googleDrive",
       "parameters": {
         "operation": "upload",
         "fileName": "={{'Research-' + $json.topic.replace(/[^a-z0-9]/gi, '-') + '-' + $now.toISOString().split('T')[0] + '.md'}}",
         "fileContent": "={{$json.report}}",
-        "folderId": {"__rl": true, "mode": "list", "value": ""},
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
         "options": {}
       },
-      "position": [1540, -100]
+      "position": [
+        1540,
+        -100
+      ],
+      "typeVersion": 1.0,
+      "id": "27d58e08-534f-4701-9a3c-af18d405a91e"
     },
     {
       "name": "Update Queue Status",
-      "type": "n8n-nodes-base.googleSheets",
+      "type": "@n8n/n8n-nodes-base.googleSheets",
       "parameters": {
         "operation": "update",
-        "documentId": {"__rl": true, "mode": "list", "value": ""},
-        "sheetName": {"__rl": true, "mode": "list", "value": "Research Queue"},
-        "columnToMatchOn": {"__rl": true, "mode": "list", "value": "query"},
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Research Queue"
+        },
+        "columnToMatchOn": {
+          "__rl": true,
+          "mode": "list",
+          "value": "query"
+        },
         "valueToMatchOn": "={{$('Router: Research Tasks').first().json.query}}",
-        "fieldsToUpdate": {"parameters": [
-          {"name": "status", "value": "completed"},
-          {"name": "completed_at", "value": "={{$now}}"}
-        ]}
+        "fieldsToUpdate": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "completed"
+            },
+            {
+              "name": "completed_at",
+              "value": "={{$now}}"
+            }
+          ]
+        }
       },
-      "position": [1760, -100]
+      "position": [
+        1760,
+        -100
+      ],
+      "typeVersion": 1.0,
+      "id": "4fa53159-2a02-4d0e-8cd3-33c8a76bdc25"
     },
     {
       "name": "Notify Research Done",
-      "type": "n8n-nodes-base.pushover",
+      "type": "@n8n/n8n-nodes-base.pushover",
       "parameters": {
-        "message": "✅ Research completado: {{$json.topic}}",
+        "message": "\u2705 Research completado: {{$json.topic}}",
         "title": "Research Listo"
       },
-      "position": [1980, -100]
+      "position": [
+        1980,
+        -100
+      ],
+      "typeVersion": 1.0,
+      "id": "17da8117-6cac-40b3-9a71-89d7edc7e2ec"
     },
     {
       "name": "No Tasks: Idle",
-      "type": "n8n-nodes-base.noOp",
+      "type": "@n8n/n8n-nodes-base.noOp",
       "parameters": {},
-      "position": [660, 200]
+      "position": [
+        660,
+        200
+      ],
+      "typeVersion": 1.0,
+      "id": "f1dd4366-7159-437c-a98e-28e74c94302d"
     },
     {
       "name": "Error Handler",
-      "type": "n8n-nodes-base.errorTrigger",
+      "type": "@n8n/n8n-nodes-base.errorTrigger",
       "parameters": {},
-      "position": [880, 400]
+      "position": [
+        880,
+        400
+      ],
+      "typeVersion": 1.0,
+      "id": "e884066d-ad2a-45e2-a044-ad09aab0c353"
     },
     {
       "name": "Notify Research Error",
-      "type": "n8n-nodes-base.pushover",
+      "type": "@n8n/n8n-nodes-base.pushover",
       "parameters": {
-        "message": "❌ Research Pipeline Error: {{$json.error.message}}",
+        "message": "\u274c Research Pipeline Error: {{$json.error.message}}",
         "title": "Research Error",
         "priority": 2
       },
-      "position": [1100, 400]
+      "position": [
+        1100,
+        400
+      ],
+      "typeVersion": 1.0,
+      "id": "b7fbb195-140b-4416-9ef4-512fab92112b"
     }
   ],
   "connections": {
-    "Cron: Every 6 Hours": {"main": [[{"node": "Read Research Queue", "type": "main", "index": 0}]]},
-    "Read Research Queue": {"main": [[{"node": "Code: Get Next Pending", "type": "main", "index": 0}]]},
-    "Code: Get Next Pending": {"main": [[{"node": "Router: Research Tasks", "type": "main", "index": 0}], [{"node": "No Tasks: Idle", "type": "main", "index": 0}]]},
-    "Router: Research Tasks": {"main": [[{"node": "Web Search (Tavily)", "type": "main", "index": 0}]]},
-    "Web Search (Tavily)": {"main": [[{"node": "AI: Summarize Findings", "type": "main", "index": 0}]]},
-    "AI: Summarize Findings": {"main": [[{"node": "Code: Build Report", "type": "main", "index": 0}]]},
-    "Code: Build Report": {"main": [[{"node": "Append to Knowledge Base (Drive)", "type": "main", "index": 0}]]},
-    "Append to Knowledge Base (Drive)": {"main": [[{"node": "Update Queue Status", "type": "main", "index": 0}]]},
-    "Update Queue Status": {"main": [[{"node": "Notify Research Done", "type": "main", "index": 0}]]},
-    "Error Handler": {"main": [[{"node": "Notify Research Error", "type": "main", "index": 0}]]}
+    "Cron: Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Read Research Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Research Queue": {
+      "main": [
+        [
+          {
+            "node": "Code: Get Next Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Get Next Pending": {
+      "main": [
+        [
+          {
+            "node": "Router: Research Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Tasks: Idle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router: Research Tasks": {
+      "main": [
+        [
+          {
+            "node": "Web Search (Tavily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Web Search (Tavily)": {
+      "main": [
+        [
+          {
+            "node": "AI: Summarize Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI: Summarize Findings": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Report": {
+      "main": [
+        [
+          {
+            "node": "Append to Knowledge Base (Drive)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Knowledge Base (Drive)": {
+      "main": [
+        [
+          {
+            "node": "Update Queue Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Queue Status": {
+      "main": [
+        [
+          {
+            "node": "Notify Research Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Notify Research Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "settings": {
     "executionOrder": "v1",
@@ -146,12 +382,19 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "staticData": null,
-  "tags": ["research", "ai", "knowledge", "automation"],
   "meta": {
-    "description": "Cada 6 horas: lee cola de research → busca web → resume con AI → guarda en Drive → actualiza status → notifica",
-    "author": "Logos",
-    "created": "2026-04-16",
-    "idempotent": true,
-    "credentials_needed": ["Google Sheets", "Google Drive", "Tavily/OpenAI", "Pushover"]
-  }
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "versionId": "d544dc56-c4f7-4f99-962f-8ad9a3bd8cf4",
+  "activeVersionId": "d544dc56-c4f7-4f99-962f-8ad9a3bd8cf4",
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "projectId": "y8YB5n4L5hyzosCq",
+      "role": "workflow:owner"
+    }
+  ]
 }
