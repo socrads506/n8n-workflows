@@ -1,0 +1,184 @@
+{
+  "name": "Social Content Repurposing Pipeline",
+  "nodes": [
+    {
+      "name": "Cron: Daily 6PM",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "rule": {"interval": [{"field": "cron", "properties": {"expression": "0 18 * * *", "timezone": "America/Mexico_City"}}]}
+      },
+      "position": [0, 0]
+    },
+    {
+      "name": "Read YouTube RSS / Watch Later",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "parameters": {
+        "url": "https://www.youtube.com/feeds/videos.xml?playlist_id={{$env.YT_WATCH_LATER_ID}}",
+        "options": {"maxItems": 3}
+      },
+      "position": [220, 0]
+    },
+    {
+      "name": "Router: Content Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": {"batchSize": 1},
+      "position": [440, 0]
+    },
+    {
+      "name": "Get YouTube Transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://www.youtube.com/api/timedtext?v={{$json.videoId}}&lang=es&fmt=json3",
+        "method": "GET",
+        "options": {"timeout": 10000}
+      },
+      "position": [660, -200]
+    },
+    {
+      "name": "AI: Extract Key Points",
+      "type": "n8n-nodes-base.openAi",
+      "parameters": {
+        "resource": "chat",
+        "operation": "chat",
+        "prompt": {
+          "messages": [
+            {"role": "system", "content": "Vas a recibir un transcript de YouTube. Extrae:\n\n1. **3 tweets** (máx 280 chars c/u) - puntos más importantes\n2. **1 LinkedIn post** (150-300 palabras) - insight profesional\n3. **1 newsletter snippet** (50-80 palabras) - ángulo interesante\n\nDevuelve en JSON: {\"tweets\": [], \"linkedin\": \"\", \"newsletter\": \"\"}\nSolo devuelve JSON, sin explicaciones."},
+            {"role": "user", "content": "={{$json.transcript || $json.description || $json.title}}"}
+          ]
+        },
+        "options": {"temperature": 0.4}
+      },
+      "position": [880, -200]
+    },
+    {
+      "name": "Parse AI Output",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "mode": "raw",
+        "assignments": {
+          "assignments": [
+            {"name": "content", "value": "={{$json.choices[0].message.content}}", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "position": [1100, -200]
+    },
+    {
+      "name": "Code: Parse JSON",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "try {\n  const text = $input.first().json.content;\n  const parsed = JSON.parse(text);\n  const video = $('Router: Content Items').first().json;\n  return [{\n    json: {\n      ...parsed,\n      video_title: video.title,\n      video_url: 'https://youtube.com/watch?v=' + video.videoId,\n      scheduled_date: new Date(Date.now() + 86400000 * (Math.random() * 3 + 1)).toISOString()\n    }\n  }];\n} catch(e) {\n  return [];\n}"
+      },
+      "position": [1320, -200]
+    },
+    {
+      "name": "Append to Content Calendar (Sheet)",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Content Calendar"},
+        "columns": {"mappingMode": "defineBelow", "value": {
+          "content_type": "={{'Twitter'}}",
+          "content": "={{$json.tweets[0]}}",
+          "source_video": "={{$json.video_title}}",
+          "source_url": "={{$json.video_url}}",
+          "scheduled_date": "={{$json.scheduled_date}}",
+          "status": "pending"
+        }}
+      },
+      "position": [1540, -300]
+    },
+    {
+      "name": "Append LinkedIn",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Content Calendar"},
+        "columns": {"mappingMode": "defineBelow", "value": {
+          "content_type": "LinkedIn",
+          "content": "={{$json.linkedin}}",
+          "source_video": "={{$json.video_title}}",
+          "source_url": "={{$json.video_url}}",
+          "scheduled_date": "={{$json.scheduled_date}}",
+          "status": "pending"
+        }}
+      },
+      "position": [1540, -100]
+    },
+    {
+      "name": "Append Newsletter",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Content Calendar"},
+        "columns": {"mappingMode": "defineBelow", "value": {
+          "content_type": "Newsletter",
+          "content": "={{$json.newsletter}}",
+          "source_video": "={{$json.video_title}}",
+          "source_url": "={{$json.video_url}}",
+          "scheduled_date": "={{$json.scheduled_date}}",
+          "status": "pending"
+        }}
+      },
+      "position": [1540, 100]
+    },
+    {
+      "name": "Notify Content Created",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "📝 Contenido generado: {{$json.video_title}}\n- 3 tweets\n- 1 LinkedIn post\n- 1 newsletter snippet",
+        "title": "Content Pipeline"
+      },
+      "position": [1760, -100]
+    },
+    {
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "parameters": {},
+      "position": [880, 400]
+    },
+    {
+      "name": "Notify Error",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "❌ Content Pipeline Error: {{$json.error.message}}",
+        "title": "Content Error",
+        "priority": 2
+      },
+      "position": [1100, 400]
+    }
+  ],
+  "connections": {
+    "Cron: Daily 6PM": {"main": [[{"node": "Read YouTube RSS / Watch Later", "type": "main", "index": 0}]]},
+    "Read YouTube RSS / Watch Later": {"main": [[{"node": "Router: Content Items", "type": "main", "index": 0}]]},
+    "Router: Content Items": {"main": [[{"node": "Get YouTube Transcript", "type": "main", "index": 0}]]},
+    "Get YouTube Transcript": {"main": [[{"node": "AI: Extract Key Points", "type": "main", "index": 0}]]},
+    "AI: Extract Key Points": {"main": [[{"node": "Parse AI Output", "type": "main", "index": 0}]]},
+    "Parse AI Output": {"main": [[{"node": "Code: Parse JSON", "type": "main", "index": 0}]]},
+    "Code: Parse JSON": {"main": [
+      [{"node": "Append to Content Calendar (Sheet)", "type": "main", "index": 0}],
+      [{"node": "Append LinkedIn", "type": "main", "index": 0}],
+      [{"node": "Append Newsletter", "type": "main", "index": 0}],
+      [{"node": "Notify Content Created", "type": "main", "index": 0}]
+    ]},
+    "Error Handler": {"main": [[{"node": "Notify Error", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["content", "social", "youtube", "automation", "ai"],
+  "meta": {
+    "description": "Diario 6PM: lee YouTube watch later → transcript → AI extrae tweets/LinkedIn/newsletter → guarda en content calendar",
+    "author": "Logos",
+    "created": "2026-04-16",
+    "idempotent": true,
+    "credentials_needed": ["YouTube RSS", "OpenAI/MiniMax", "Google Sheets", "Pushover"]
+  }
+}

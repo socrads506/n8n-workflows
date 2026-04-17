@@ -1,0 +1,160 @@
+{
+  "name": "Email Intake → Task Pipeline",
+  "nodes": [
+    {
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "parameters": {
+        "pollTimes": {"__rl": true, "mode": "everyMinute"}
+      },
+      "position": [0, 0]
+    },
+    {
+      "name": "Filter: Only FROM Contacts",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "dataType": "string",
+        "valueComparison": {"mode": "name", "name": "={{$json.from}}"},
+        "rules": {
+          "values": [
+            {"value2": "", "operation": "notExists"}
+          ]
+        },
+        "fallbackOutput": "output"
+      },
+      "position": [220, 0]
+    },
+    {
+      "name": "Extract Action Items (AI)",
+      "type": "n8n-nodes-base.openAi",
+      "parameters": {
+        "resource": "chat",
+        "operation": "chat",
+        "prompt": {
+          "messages": [
+            {"role": "system", "content": "Eres un asistente que extrae action items de emails. Devuelve SOLO un JSON array con objetos: [{\"task\": \"descripcion\", \"assignee\": \"quien lo hace\", \"due\": \"YYYY-MM-DD o null\", \"priority\": \"high/medium/low\"}]. Si no hay action items, devuelve []. Solo devuelve el JSON, nada más."},
+            {"role": "user", "content": "={{$json.body}"}
+          ]
+        },
+        "options": {"temperature": 0.1}
+      },
+      "position": [440, 0]
+    },
+    {
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "mode": "raw",
+        "assignments": {
+          "assignments": [
+            {"name": "actions", "value": "={{$json.choices[0].message.content}}", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "position": [660, 0]
+    },
+    {
+      "name": "Code: Parse Actions Array",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const text = $input.first().json.actions;\ntry {\n  const actions = JSON.parse(text);\n  return actions.map(a => ({...a, source_email: $('Gmail Trigger').first().json.subject, source_from: $('Gmail Trigger').first().json.from}));\n} catch(e) {\n  return [];\n}"
+      },
+      "position": [880, 0]
+    },
+    {
+      "name": "Router: Create Task per Action",
+      "type": "n8n-nodes-base.router",
+      "parameters": {
+        "nodeDefinition": {"sourceData": {"byItem": true}}
+      },
+      "position": [1100, 0]
+    },
+    {
+      "name": "Create Google Task",
+      "type": "n8n-nodes-base.googleTasks",
+      "parameters": {
+        "operation": "createTask",
+        "taskList": {"__rl": true, "mode": "list", "value": ""},
+        "title": "={{$json.task}}",
+        "notes": "={{'From: ' + $json.source_from + '\\nEmail: ' + $json.source_email}}",
+        "dueDate": "={{$json.due}}",
+        "options": {}
+      },
+      "position": [1320, 0]
+    },
+    {
+      "name": "Label Email as Processed",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "addLabel",
+        "label": "processed-by-logos"
+      },
+      "position": [1540, 0]
+    },
+    {
+      "name": "Notify Task Created",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "✅ Tarea creada: {{$json.task}} ({{$json.assignee}})",
+        "title": "Email → Tarea"
+      },
+      "position": [1760, 0]
+    },
+    {
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "parameters": {},
+      "position": [1980, 300]
+    },
+    {
+      "name": "Notify Error",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "❌ Email→Task Pipeline Error: {{$json.error.message}}",
+        "title": "Workflow Error",
+        "priority": 2
+      },
+      "position": [2200, 300]
+    },
+    {
+      "name": "Write Error to Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://script.google.com/macros/s/{{$env.GAS_ERROR_SCRIPT_ID}}/exec",
+        "method": "POST",
+        "bodyParameters": {"parameters": [{"name": "workflow", "value": "Email-Task-Pipeline"}, {"name": "error", "value": "={{$json.error.message}}"}, {"name": "timestamp", "value": "={{$now}}"}]}
+      },
+      "position": [2420, 300]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {"main": [[{"node": "Filter: Only FROM Contacts", "type": "main", "index": 0}]]},
+    "Filter: Only FROM Contacts": {"main": [[{"node": "Extract Action Items (AI)", "type": "main", "index": 0}]]},
+    "Extract Action Items (AI)": {"main": [[{"node": "Parse JSON", "type": "main", "index": 0}]]},
+    "Parse JSON": {"main": [[{"node": "Code: Parse Actions Array", "type": "main", "index": 0}]]},
+    "Code: Parse Actions Array": {"main": [[{"node": "Router: Create Task per Action", "type": "main", "index": 0}]]},
+    "Router: Create Task per Action": {"main": [
+      [{"node": "Create Google Task", "type": "main", "index": 0}],
+      [{"node": "Create Google Task", "type": "main", "index": 0}]
+    ]},
+    "Create Google Task": {"main": [[{"node": "Label Email as Processed", "type": "main", "index": 0}]]},
+    "Label Email as Processed": {"main": [[{"node": "Notify Task Created", "type": "main", "index": 0}]]},
+    "Error Handler": {"main": [[{"node": "Notify Error", "type": "main", "index": 0}]]},
+    "Notify Error": {"main": [[{"node": "Write Error to Log", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["email", "tasks", "automation", "ai"],
+  "meta": {
+    "description": "Every minute: watch Gmail → extract action items via AI → create Google Tasks → label email",
+    "author": "Logos",
+    "created": "2026-04-16",
+    "idempotent": true,
+    "credentials_needed": ["Gmail", "Google Tasks", "OpenAI/MiniMax", "Pushover"]
+  }
+}

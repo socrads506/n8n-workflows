@@ -1,0 +1,168 @@
+{
+  "name": "Invoice Generation + Payment Follow-up",
+  "nodes": [
+    {
+      "name": "Cron: Daily 9AM",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "rule": {"interval": [{"field": "cron", "properties": {"expression": "0 9 * * *", "timezone": "America/Mexico_City"}}]}
+      },
+      "position": [0, 0]
+    },
+    {
+      "name": "Read Invoices Spreadsheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "read",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Invoices"},
+        "options": {"outputFormatting": true}
+      },
+      "position": [220, 0]
+    },
+    {
+      "name": "Code: Filter Overdue Invoices",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const invoices = $input.all();\nconst today = new Date();\ntoday.setHours(0,0,0,0);\n\nreturn invoices.map(inv => {\n  const due = new Date(inv.json.due_date);\n  due.setHours(0,0,0,0);\n  const daysOverdue = Math.floor((today - due) / (1000*60*60*24));\n  return {...inv, json: {...inv.json, daysOverdue}};\n}).filter(inv => inv.json.status !== 'paid' && inv.json.daysOverdue > 0);"
+      },
+      "position": [440, 0]
+    },
+    {
+      "name": "Router: By Days Overdue",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "dataType": "number",
+        "valueComparison": {"mode": "name", "name": "={{$json.daysOverdue}}"},
+        "rules": {
+          "values": [
+            {"value2": "1", "operation": "equals", "output": 0},
+            {"value2": "7", "operation": "equals", "output": 1},
+            {"value2": "14", "operation": "equals", "output": 2},
+            {"value2": "30", "operation": "equals", "output": 3}
+          ]
+        },
+        "fallbackOutput": "null"
+      },
+      "position": [660, 0]
+    },
+    {
+      "name": "Send Friendly Reminder (1 day)",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "send",
+        "to": "={{$json.client_email}}",
+        "subject": "={{'Recordatorio: Factura #' + $json.invoice_number + ' vence hoy'}}",
+        "body": "={{'Hola ' + $json.client_name + ',\\n\\nTe recuerdamos que la factura #' + $json.invoice_number + ' por $' + $json.amount + ' vence hoy.\\n\\nPodés pagarla cuando puedas.\\n\\nGracias!'}}"
+      },
+      "position": [880, -300]
+    },
+    {
+      "name": "Send 1st Reminder (7 days)",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "send",
+        "to": "={{$json.client_email}}",
+        "subject": "={{'Recordatorio: Factura #' + $json.invoice_number + ' pendiente (7 días)'}}",
+        "body": "={{'Hola ' + $json.client_name + ',\\n\\nTe escribimos para recordarte que la factura #' + $json.invoice_number + ' por $' + $json.amount + ' tiene 7 días de atraso.\\n\\nPor favor confirmános el estado del pago.\\n\\nGracias!'}}"
+      },
+      "position": [880, -100]
+    },
+    {
+      "name": "Send 2nd Reminder (14 days)",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "send",
+        "to": "={{$json.client_email}}",
+        "subject": "={{'[URGENTE] Factura #' + $json.invoice_number + ' - 14 días pendiente'}}",
+        "body": "={{'Hola ' + $json.client_name + ',\\n\\nLa factura #' + $json.invoice_number + ' por $' + $json.amount + ' lleva 14 días de atraso.\\n\\nPor favor necesito confirmación del pago o una fecha estimada.\\n\\nGracias!'}}"
+      },
+      "position": [880, 100]
+    },
+    {
+      "name": "Send Final Notice (30 days)",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "send",
+        "to": "={{$json.client_email}}",
+        "subject": "={{'[ÚLTIMO AVISO] Factura #' + $json.invoice_number + ' - 30 días'}}",
+        "body": "={{'Hola ' + $json.client_name + ',\\n\\nEsta es una última comunicación sobre la factura #' + $json.invoice_number + ' por $' + $json.amount + ' que lleva 30 días pendiente.\\n\\nSi no recibís confirmación de pago en los próximos 5 días, voy a tener que pausar los servicios hasta regularizar la situación.\\n\\nGracias por su atención.'}}"
+      },
+      "position": [880, 300]
+    },
+    {
+      "name": "Notify Anthony (30+ days)",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "🚨 Factura crítica: #{{$json.invoice_number}} - ${{$json.amount}} - {{$json.daysOverdue}} días de atraso\nCliente: {{$json.client_name}}",
+        "title": "Factura Crítica!",
+        "priority": 2,
+        "sound": "siren"
+      },
+      "position": [1100, 300]
+    },
+    {
+      "name": "Update Invoice Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "update",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Invoices"},
+        "columnToMatchOn": {"__rl": true, "mode": "list", "value": "invoice_number"},
+        "valueToMatchOn": "={{$json.invoice_number}}",
+        "fieldsToUpdate": {"parameters": [
+          {"name": "last_reminder", "value": "={{$now}}"},
+          {"name": "status", "value": "={{'reminder_sent_' + $json.daysOverdue + 'd'}}"}
+        ]}
+      },
+      "position": [1320, 0]
+    },
+    {
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "parameters": {},
+      "position": [1540, 500]
+    },
+    {
+      "name": "Notify Error",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "❌ Invoice Workflow Error: {{$json.error.message}}",
+        "title": "Invoice Workflow Error",
+        "priority": 2
+      },
+      "position": [1760, 500]
+    }
+  ],
+  "connections": {
+    "Cron: Daily 9AM": {"main": [[{"node": "Read Invoices Spreadsheet", "type": "main", "index": 0}]]},
+    "Read Invoices Spreadsheet": {"main": [[{"node": "Code: Filter Overdue Invoices", "type": "main", "index": 0}]]},
+    "Code: Filter Overdue Invoices": {"main": [[{"node": "Router: By Days Overdue", "type": "main", "index": 0}]]},
+    "Router: By Days Overdue": {"main": [
+      [{"node": "Send Friendly Reminder (1 day)", "type": "main", "index": 0}],
+      [{"node": "Send 1st Reminder (7 days)", "type": "main", "index": 0}],
+      [{"node": "Send 2nd Reminder (14 days)", "type": "main", "index": 0}],
+      [{"node": "Send Final Notice (30 days)", "type": "main", "index": 0}]
+    ]},
+    "Send Final Notice (30 days)": {"main": [[{"node": "Notify Anthony (30+ days)", "type": "main", "index": 0}]]},
+    "Router: By Days Overdue": {"main": [[{"node": "Update Invoice Status", "type": "main", "index": 0}]]},
+    "Send Friendly Reminder (1 day)": {"main": [[{"node": "Update Invoice Status", "type": "main", "index": 0}]]},
+    "Send 1st Reminder (7 days)": {"main": [[{"node": "Update Invoice Status", "type": "main", "index": 0}]]},
+    "Send 2nd Reminder (14 days)": {"main": [[{"node": "Update Invoice Status", "type": "main", "index": 0}]]},
+    "Error Handler": {"main": [[{"node": "Notify Error", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["invoices", "payments", "finance", "automation"],
+  "meta": {
+    "description": "Diario 9AM: lee facturas pendientes → envía recordatorios escalonados (1/7/14/30 días) → actualiza status → notifica en críticos",
+    "author": "Logos",
+    "created": "2026-04-16",
+    "idempotent": true,
+    "credentials_needed": ["Google Sheets", "Gmail", "Pushover"]
+  }
+}

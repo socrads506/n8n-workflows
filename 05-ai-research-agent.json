@@ -1,0 +1,157 @@
+{
+  "name": "AI Research Agent Pipeline",
+  "nodes": [
+    {
+      "name": "Cron: Every 6 Hours",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "rule": {"interval": [{"field": "cron", "properties": {"expression": "0 */6 * * *", "timezone": "America/Mexico_City"}}]}
+      },
+      "position": [0, 0]
+    },
+    {
+      "name": "Read Research Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "read",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Research Queue"},
+        "options": {"outputFormatting": true}
+      },
+      "position": [220, 0]
+    },
+    {
+      "name": "Code: Get Next Pending",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst pending = items.filter(i => i.json.status === 'pending').slice(0, 3);\nreturn pending.length ? pending : [];"
+      },
+      "position": [440, 0]
+    },
+    {
+      "name": "Router: Research Tasks",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": {"batchSize": 1},
+      "position": [660, 0]
+    },
+    {
+      "name": "Web Search (Tavily)",
+      "type": "n8n-nodes-base.tavily",
+      "parameters": {
+        "operation": "search",
+        "query": "={{$json.query}}",
+        "maxResults": {"__rl": true, "mode": "list", "value": 10}
+      },
+      "position": [880, -100]
+    },
+    {
+      "name": "AI: Summarize Findings",
+      "type": "n8n-nodes-base.openAi",
+      "parameters": {
+        "resource": "chat",
+        "operation": "chat",
+        "prompt": {
+          "messages": [
+            {"role": "system", "content": "Eres un research analyst experto. Vas a recibir resultados de búsqueda web y vas a escribir un resumen estructurado en español con:\n\n## Tema\n\n## Hallazgos Principales (3-5 puntos)\n\n## Datos Clave (con fuentes)\n\n## Implicaciones\n\n## Siguientes Preguntas\n\nSé conciso, factual, y cita las fuentes de donde viene cada dato."},
+            {"role": "user", "content": "={{'Tema: ' + $('Router: Research Tasks').first().json.topic + '\\n\\nResultados de búsqueda:\\n' + JSON.stringify($input.all().map(i => i.json), null, 2)}}"}
+          ]
+        },
+        "options": {"temperature": 0.3}
+      },
+      "position": [1100, -100]
+    },
+    {
+      "name": "Code: Build Report",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const task = $('Router: Research Tasks').first().json;\nconst summary = $input.first().json;\n\n return [{\n  json: {\n    topic: task.topic,\n    query: task.query,\n    report: summary.choices?.[0]?.message?.content || JSON.stringify(summary),\n    researched_at: new Date().toISOString(),\n    status: 'completed',\n    priority: task.priority\n  }\n}];"
+      },
+      "position": [1320, -100]
+    },
+    {
+      "name": "Append to Knowledge Base (Drive)",
+      "type": "n8n-nodes-base.googleDrive",
+      "parameters": {
+        "operation": "upload",
+        "fileName": "={{'Research-' + $json.topic.replace(/[^a-z0-9]/gi, '-') + '-' + $now.toISOString().split('T')[0] + '.md'}}",
+        "fileContent": "={{$json.report}}",
+        "folderId": {"__rl": true, "mode": "list", "value": ""},
+        "options": {}
+      },
+      "position": [1540, -100]
+    },
+    {
+      "name": "Update Queue Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "parameters": {
+        "operation": "update",
+        "documentId": {"__rl": true, "mode": "list", "value": ""},
+        "sheetName": {"__rl": true, "mode": "list", "value": "Research Queue"},
+        "columnToMatchOn": {"__rl": true, "mode": "list", "value": "query"},
+        "valueToMatchOn": "={{$('Router: Research Tasks').first().json.query}}",
+        "fieldsToUpdate": {"parameters": [
+          {"name": "status", "value": "completed"},
+          {"name": "completed_at", "value": "={{$now}}"}
+        ]}
+      },
+      "position": [1760, -100]
+    },
+    {
+      "name": "Notify Research Done",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "✅ Research completado: {{$json.topic}}",
+        "title": "Research Listo"
+      },
+      "position": [1980, -100]
+    },
+    {
+      "name": "No Tasks: Idle",
+      "type": "n8n-nodes-base.noOp",
+      "parameters": {},
+      "position": [660, 200]
+    },
+    {
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "parameters": {},
+      "position": [880, 400]
+    },
+    {
+      "name": "Notify Research Error",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "❌ Research Pipeline Error: {{$json.error.message}}",
+        "title": "Research Error",
+        "priority": 2
+      },
+      "position": [1100, 400]
+    }
+  ],
+  "connections": {
+    "Cron: Every 6 Hours": {"main": [[{"node": "Read Research Queue", "type": "main", "index": 0}]]},
+    "Read Research Queue": {"main": [[{"node": "Code: Get Next Pending", "type": "main", "index": 0}]]},
+    "Code: Get Next Pending": {"main": [[{"node": "Router: Research Tasks", "type": "main", "index": 0}], [{"node": "No Tasks: Idle", "type": "main", "index": 0}]]},
+    "Router: Research Tasks": {"main": [[{"node": "Web Search (Tavily)", "type": "main", "index": 0}]]},
+    "Web Search (Tavily)": {"main": [[{"node": "AI: Summarize Findings", "type": "main", "index": 0}]]},
+    "AI: Summarize Findings": {"main": [[{"node": "Code: Build Report", "type": "main", "index": 0}]]},
+    "Code: Build Report": {"main": [[{"node": "Append to Knowledge Base (Drive)", "type": "main", "index": 0}]]},
+    "Append to Knowledge Base (Drive)": {"main": [[{"node": "Update Queue Status", "type": "main", "index": 0}]]},
+    "Update Queue Status": {"main": [[{"node": "Notify Research Done", "type": "main", "index": 0}]]},
+    "Error Handler": {"main": [[{"node": "Notify Research Error", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["research", "ai", "knowledge", "automation"],
+  "meta": {
+    "description": "Cada 6 horas: lee cola de research → busca web → resume con AI → guarda en Drive → actualiza status → notifica",
+    "author": "Logos",
+    "created": "2026-04-16",
+    "idempotent": true,
+    "credentials_needed": ["Google Sheets", "Google Drive", "Tavily/OpenAI", "Pushover"]
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "name": "Client Onboarding Automation",
+  "nodes": [
+    {
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "client-onboard",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "position": [0, 0]
+    },
+    {
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "dataType": "string",
+        "valueComparison": {"mode": "name", "name": "={{$json.client_email}}"},
+        "rules": {"values": [{"value2": "", "operation": "notExists"}]},
+        "fallbackOutput": "null"
+      },
+      "position": [220, 0]
+    },
+    {
+      "name": "Code: Build Onboarding Data",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst now = new Date();\nconst due = (days) => {\n  const dt = new Date(now);\n  dt.setDate(dt.getDate() + days);\n  return dt.toISOString();\n};\nreturn [{\n  json: {\n    client_name: d.client_name,\n    client_email: d.client_email,\n    company: d.company,\n    service: d.service,\n    start_date: d.start_date || now.toISOString().split('T')[0],\n    tasks: [\n      { task: 'Enviar email de bienvenida + brochure', due: due(1), priority: 'high' },\n      { task: 'Agendar llamada de descubierta (30 min)', due: due(3), priority: 'high' },\n      { task: 'Enviar formulario de intake', due: due(3), priority: 'medium' },\n      { task: 'Crear carpeta en Drive + compartir', due: due(2), priority: 'medium' },\n      { task: 'Preparar propuesta detallada', due: due(7), priority: 'medium' },\n      { task: 'Generar invoice de setup si aplica', due: due(5), priority: 'medium' },\n      { task: 'Primer entregable según servicio', due: due(14), priority: 'high' },\n      { task: 'Revisión 30 días + feedback', due: due(30), priority: 'low' }\n    ]\n  }\n}];"
+      },
+      "position": [440, 0]
+    },
+    {
+      "name": "Router: All Onboarding Steps",
+      "type": "n8n-nodes-base.splitInBatches",
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "position": [660, 0]
+    },
+    {
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "send",
+        "to": "={{$json.client_email}}",
+        "subject": "={{'Bienvenido ' + $json.client_name + ' - Vamos a empezar!'}}",
+        "body": "={{'Hola ' + $json.client_name + ',\\n\\nGracias por confiar en nosotros. Estamos emocionados de trabajar con ' + $json.company + ' en ' + $json.service + '.\\n\\nPróximos pasos:\\n1. Revisá el brochure adjunto\\n2. Agendamos una llamada de descubierta\\n3. Te vamos a enviar un formulario de intake\\n\\nTe escribimos pronto!\\n\\nSaludos,\\nLogos (AI Assistant de Anthony)'}}",
+        "attachments": {"mappingMode": "defineBelow", "value": [{"name": "={{'Brochure-' + $json.company + '.pdf'}}"}]}
+      },
+      "position": [880, -200]
+    },
+    {
+      "name": "Create Task (Google Tasks)",
+      "type": "n8n-nodes-base.googleTasks",
+      "parameters": {
+        "operation": "createTask",
+        "taskList": {"__rl": true, "mode": "list", "value": ""},
+        "title": "={{$json.tasks[$vars.clientIndex].task}}",
+        "notes": "={{'Cliente: ' + $json.client_name + ' (' + $json.client_email + ')\\nEmpresa: ' + $json.company}}",
+        "dueDate": "={{$json.tasks[$vars.clientIndex].due}}",
+        "options": {}
+      },
+      "position": [880, 0]
+    },
+    {
+      "name": "Create Notion Page (Client Folder)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://api.notion.com/v1/pages",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "Bearer {{$env.NOTION_API_KEY}}"}, {"name": "Content-Type", "value": "application/json"}]},
+        "bodyParameters": {"parameters": [
+          {"name": "parent", "value": {"database_id": "{{$env.NOTION_CLIENTS_DB}}"}},
+          {"name": "properties", "value": {"Name": {"title": [{"text": {"content": "={{$json.client_name}}"}}]}, "Email": {"email": "={{$json.client_email}}"}, "Company": {"rich_text": [{"text": {"content": "={{$json.company}}"}}]}, "Service": {"select": {"name": "={{$json.service}"}}, "Status": {"select": {"name": "Onboarding"}}}}
+        ]}
+      },
+      "position": [880, 200]
+    },
+    {
+      "name": "Notify Anthony (Pushover)",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "🆕 Nuevo cliente onboardeado: {{$json.client_name}} ({{$json.company}})\nServicio: {{$json.service}}\n{{$json.tasks.length}} tareas creadas",
+        "title": "Cliente Nuevo - Onboarding",
+        "sound": "cashregister"
+      },
+      "position": [1100, 0]
+    },
+    {
+      "name": "Done: Send Confirmation",
+      "type": "n8n-nodes-base.gmail",
+      "parameters": {
+        "operation": "send",
+        "to": "={{$json.client_email}}",
+        "subject": "Tu onboarding está en marcha!",
+        "body": "={{'Hola ' + $json.client_name + ',\\n\\nConfirmamos que todo está listo. Vas a recibir un email con el brochure y pronto te vamos a contactar para agendar nuestra llamada.\\n\\nSaludos!'}}"
+      },
+      "position": [1320, 0]
+    },
+    {
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "parameters": {},
+      "position": [1540, 400]
+    },
+    {
+      "name": "Notify Onboarding Error",
+      "type": "n8n-nodes-base.pushover",
+      "parameters": {
+        "message": "❌ Onboarding Error: {{$json.error.message}} - Cliente: {{$json.client_email}}",
+        "title": "Workflow Error",
+        "priority": 2
+      },
+      "position": [1760, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {"main": [[{"node": "Validate Payload", "type": "main", "index": 0}]]},
+    "Validate Payload": {"main": [[{"node": "Code: Build Onboarding Data", "type": "main", "index": 0}]]},
+    "Code: Build Onboarding Data": {"main": [[{"node": "Router: All Onboarding Steps", "type": "main", "index": 0}]]},
+    "Router: All Onboarding Steps": {"main": [
+      [{"node": "Send Welcome Email", "type": "main", "index": 0}],
+      [{"node": "Create Task (Google Tasks)", "type": "main", "index": 0}],
+      [{"node": "Create Notion Page (Client Folder)", "type": "main", "index": 0}],
+      [{"node": "Notify Anthony (Pushover)", "type": "main", "index": 0}],
+      [{"node": "Done: Send Confirmation", "type": "main", "index": 0}]
+    ]},
+    "Error Handler": {"main": [[{"node": "Notify Onboarding Error", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["onboarding", "clients", "automation", "crm"],
+  "meta": {
+    "description": "Webhook: recibe nuevo cliente → crea 8 tareas secuenciales → envía emails → crea página en Notion → notifica",
+    "author": "Logos",
+    "created": "2026-04-16",
+    "idempotent": false,
+    "credentials_needed": ["Gmail", "Google Tasks", "Notion API", "Pushover"]
+  }
+}
